@@ -9,7 +9,7 @@ get = genericIndex
 
 data LambdaElement = Abstraction LambdaElement | Application LambdaElement LambdaElement | Variable Integer
 
-
+--shows variable names in a deBruijn indexing system
 show_L_with_var_names :: LambdaElement -> Integer -> [String]  -> String
 show_L_with_var_names (Variable v) depth symbols = if v<=depth then symbols `get` (depth - v)
                                                                else (concat ["<", show v, ">"])
@@ -27,12 +27,14 @@ show_L_with_var_names (Application la lb) depth symbols = la_as_string++" "++lb_
                                                                                                                       else  as_string
                                                                   [la_as_string, lb_as_string] = map in_parens_if_necessary [la, lb]
 
-
+--the variable names that will be used: first it's just the alphabet, and then it adds pedices
 alphabet = map (\c->[c]) ['a'..'z']
 subscript_numbers = ["₀","₁","₂","₃","₄","₅","₆","₇","₈","₉"];
 getDigits 0 = []
 getDigits n = (getDigits $ div n 10)++[mod n 10]
 
+
+--shows a pretty lambda expression
 instance Show LambdaElement where
     show l =  show_L_with_var_names l (-1) symbols
                 where alphabet_with_symbol s = map (++s) alphabet
@@ -40,7 +42,7 @@ instance Show LambdaElement where
                       all_subscripts = map showNumberAsSubscript [0..]
                       symbols = concatMap alphabet_with_symbol all_subscripts
 
-
+--from now on, a dictionary is an association list between expressions and names, this is to show expressions using their common names when possible
 
 
 showCombinators :: [(String, LambdaElement)] -> LambdaElement -> String
@@ -54,7 +56,7 @@ showCombinators dict l = let lookUpDict l' = find (\(v, vl)->alphaEquivalent vl 
 
 
 
-
+--checks for alpha equivalence
 alphaEquivalent :: LambdaElement -> LambdaElement -> Bool
 alphaEquivalent (Variable n) (Variable m) = n==m
 alphaEquivalent (Abstraction b) (Abstraction p) = alphaEquivalent b p
@@ -78,7 +80,7 @@ modifyFreeVariables func l = modifyFreeVariables' (-1) l
                                       modifyFreeVariables' depth ab@(Abstraction body) = lambdaFmap (modifyFreeVariables' (depth+1)) ab
                                       modifyFreeVariables' depth app@(Application _ _) = lambdaFmap (modifyFreeVariables' depth) app
 
-
+--to chance context in the deBruijn indexing system
 raiseFreeVariables :: LambdaElement -> LambdaElement
 raiseFreeVariables l = modifyFreeVariables (\x-> x-1) l
 
@@ -209,7 +211,26 @@ allExpressionsOfLength n = expressionsWithFreeVariables (-1) n
 
 allDifferentCombinatorsOfLength n = nubBy alphaEquivalent $ map betaReduceRepeat $ allExpressionsOfLength n
 
+makeAllCombinationsOfDict :: [LambdaElement] ->Integer ->  [LambdaElement]
+makeAllCombinationsOfDict dict 0 = []
+makeAllCombinationsOfDict dict 1 = dict
+makeAllCombinationsOfDict dict n = nubBy alphaEquivalent allReducedCombinations
+                                    where rec = makeAllCombinationsOfDict dict 
+                                          allPartitionsOfN = map (\x->(x, n-x)) [1..(n-1)]
+                                          allUnreducedApplications = concatMap (\(a, b)->Application <$> (rec a) <*> (rec b)) allPartitionsOfN
+                                          allReducedCombinations = map (etaReduce . betaReduceRepeat) allUnreducedApplications
 
+
+
+
+
+
+boringSet n = choosers++holders
+                where allPairs = concatMap (\x->zip (repeat x) [0..(x-1)]) [1..n]
+                      choosers = map (uncurry  makeChooserCombinator) allPairs
+                      holders  = map (uncurry makeHolderCombinator) allPairs
+                      
+                      
 
 --this is the main functionality of this program, to generate all the lambda expressions 
 --n is the maximum depth of the tree representing the lambda expression
@@ -245,24 +266,7 @@ showZoo n = mapM_ (putStrLn . showWithCommonCombinators . betaReduceRepeat) $ al
 
 
 
-makeAllCombinationsOfDict :: [LambdaElement] ->Integer ->  [LambdaElement]
-makeAllCombinationsOfDict dict 0 = []
-makeAllCombinationsOfDict dict 1 = dict
-makeAllCombinationsOfDict dict n = nubBy alphaEquivalent allReducedCombinations
-                                    where rec = makeAllCombinationsOfDict dict 
-                                          allPartitionsOfN = map (\x->(x, n-x)) [1..(n-1)]
-                                          allUnreducedApplications = concatMap (\(a, b)->Application <$> (rec a) <*> (rec b)) allPartitionsOfN
-                                          allReducedCombinations = map (etaReduce . betaReduceRepeat) allUnreducedApplications
 
-
-
-
-
-
-boringSet n = choosers++holders
-                where allPairs = concatMap (\x->zip (repeat x) [0..(x-1)]) [1..n]
-                      choosers = map (uncurry  makeChooserCombinator) allPairs
-                      holders  = map (uncurry makeHolderCombinator) allPairs
 
 
 
